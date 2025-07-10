@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"submissions-bootstrap-node/pkg/service"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -34,6 +35,24 @@ func main() {
 	// Print the node's multiaddress for others to connect
 	log.Infof("🚀 Bootstrap node started. ID: %s", node.Host.ID().String())
 	log.Infof("🌍 Listening on addresses: %s", node.Host.Addrs())
+
+	// Start periodic peer logging
+	go func() {
+		ticker := time.NewTicker(60 * time.Second) // Log every 10 seconds
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				peers := node.Host.Network().Peers()
+				log.Infof("Connected peers: %d", len(peers))
+				for _, p := range peers {
+					log.Debugf("  - %s", p.String())
+				}
+			}
+		}
+	}()
 
 	// Wait for a shutdown signal
 	sigs := make(chan os.Signal, 1)
