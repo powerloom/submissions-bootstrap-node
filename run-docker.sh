@@ -20,12 +20,11 @@ sleep 3
 # Get the container's logs to find the multiaddress
 LOGS=$(docker logs ${CONTAINER_NAME})
 
-# Extract the Peer ID and IP address from the logs
+# Extract the Peer ID
 PEER_ID=$(echo "$LOGS" | grep "Libp2p host created with ID:" | awk '{print $NF}')
 
-# Assuming it's running locally, use 127.0.0.1 for the IP
-# If running remotely, you'd replace 127.0.0.1 with the remote server's public IP
+# Construct the full multiaddress
 MULTIADDR="/ip4/127.0.0.1/tcp/${PORT}/p2p/${PEER_ID}"
 
 echo "✅ Bootstrap node is running."
-echo "🌍 Multiaddress for other nodes: ${MULTIADDR}"
+echo "🌍 Multiaddress for other nodes: ${MULTIADDR} (replace 127.0.0.1 with current remote host's public IP address)"
