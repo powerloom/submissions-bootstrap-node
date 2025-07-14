@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	log "github.com/sirupsen/logrus"
@@ -16,7 +19,26 @@ type BootstrapNode struct {
 }
 
 // NewBootstrapNode creates and initializes a new libp2p host configured as a bootstrap node
-func NewBootstrapNode(ctx context.Context, port int) (*BootstrapNode, error) {
+func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*BootstrapNode, error) {
+	var priv crypto.PrivKey
+	var err error
+
+	if privateKeyHex != "" {
+		privBytes, err := hex.DecodeString(privateKeyHex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode private key: %w", err)
+		}
+		priv, err = crypto.UnmarshalEd25519PrivateKey(privBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
+		}
+	} else {
+		priv, _, err = crypto.GenerateEd25519Key(rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate private key: %w", err)
+		}
+	}
+
 	// Create a connection manager
 	connMgr, err := connmgr.NewConnManager(
 		100, // Lowwater
@@ -29,6 +51,7 @@ func NewBootstrapNode(ctx context.Context, port int) (*BootstrapNode, error) {
 	// Create the libp2p host
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
+		libp2p.Identity(priv),
 		libp2p.ConnectionManager(connMgr),
 		libp2p.ForceReachabilityPublic(), // Announce ourselves as publicly reachable
 		libp2p.NATPortMap(),              // Attempt to open ports via NAT

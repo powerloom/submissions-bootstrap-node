@@ -20,6 +20,34 @@ go build ./cmd/main.go
 
 This will create an executable named `main` (or `main.exe` on Windows) in the current directory.
 
+## Configuration
+
+To ensure a consistent Peer ID and multiaddress for your bootstrap node, you should configure it with a static private key. If no private key is provided, a new one will be generated on each startup, resulting in a different Peer ID and multiaddress.
+
+1.  **Generate a Private Key:**
+
+    You can generate a new private key and its corresponding Peer ID and multiaddress by running the bootstrap node executable with the `--generate-key` flag:
+
+    ```bash
+    go run ./cmd/main.go --generate-key
+    ```
+
+    This will output the generated private key (hex-encoded), the derived Peer ID, and a local placeholder multiaddress. Copy the `Generated Private Key (hex)` value.
+
+2.  **Configure the `.env` file:**
+
+    Copy `.env.example` to `.env`:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit the `.env` file and set the `PRIVATE_KEY` variable with the hex-encoded private key generated in the previous step.
+
+    ```dotenv
+    PRIVATE_KEY=your_generated_private_key_here
+    ```
+
 ## Run
 
 You can run the bootstrap node on a default port or specify a custom one.

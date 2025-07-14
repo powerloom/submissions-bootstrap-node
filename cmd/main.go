@@ -2,32 +2,83 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"submissions-bootstrap-node/pkg/config"
 	"submissions-bootstrap-node/pkg/service"
 	"syscall"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	// Command-line flags
 	port := flag.Int("port", 4001, "Port to listen on")
+	generateKey := flag.Bool("generate-key", false, "Generate a new private key and exit")
 	flag.Parse()
 
 	// Initialize logger
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
 	log.SetLevel(log.InfoLevel)
 
+	if *generateKey {
+		// Generate a new Ed25519 private key
+		priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
+		if err != nil {
+			fmt.Printf("Error generating private key: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Get the Peer ID from the private key
+		peerID, err := peer.IDFromPrivateKey(priv)
+		if err != nil {
+			fmt.Printf("Error getting Peer ID: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Encode the private key to hex for storage
+		privBytes, err := crypto.MarshalPrivateKey(priv)
+		if err != nil {
+			fmt.Printf("Error marshalling private key: %v\n", err)
+			os.Exit(1)
+		}
+		privateKeyHex := hex.EncodeToString(privBytes)
+
+		// Construct a multiaddress (using a placeholder IP and default port 4001)
+		multiAddrStr := fmt.Sprintf("/ip4/127.0.0.1/tcp/4001/p2p/%s", peerID.String())
+		_, err = multiaddr.NewMultiaddr(multiAddrStr) // Validate multiaddress format
+		if err != nil {
+			fmt.Printf("Error creating multiaddress: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Generated Private Key (hex):", privateKeyHex)
+		fmt.Println("Derived Peer ID:", peerID.String())
+		fmt.Println("Expected Multiaddress (local placeholder):", multiAddrStr)
+		fmt.Println("\nRemember to replace '127.0.0.1' with your bootstrap node's public IP address when configuring other nodes.")
+		return
+	}
+
+	// Load config
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Warnf("Failed to load config: %v. A new private key will be generated.", err)
+	}
+
 	// Create a context that is canceled on a graceful shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Initialize and start the bootstrap node service
-	node, err := service.NewBootstrapNode(ctx, *port)
+	node, err := service.NewBootstrapNode(ctx, *port, cfg.PrivateKey)
 	if err != nil {
 		log.Fatalf("Failed to create bootstrap node: %v", err)
 	}
