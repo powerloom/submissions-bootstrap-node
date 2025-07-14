@@ -44,13 +44,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Encode the private key to hex for storage
-		privBytes, err := crypto.MarshalPrivateKey(priv)
+		// Encode the raw private key to hex for storage (64 bytes = 128 hex characters)
+		rawPriv, err := priv.Raw()
 		if err != nil {
-			fmt.Printf("Error marshalling private key: %v\n", err)
+			fmt.Printf("Error getting raw private key: %v\n", err)
 			os.Exit(1)
 		}
-		privateKeyHex := hex.EncodeToString(privBytes)
+		privateKeyHex := hex.EncodeToString(rawPriv)
 
 		// Construct a multiaddress (using a placeholder IP and default port 4001)
 		multiAddrStr := fmt.Sprintf("/ip4/127.0.0.1/tcp/4001/p2p/%s", peerID.String())
