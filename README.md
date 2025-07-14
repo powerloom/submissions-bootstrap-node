@@ -20,6 +20,30 @@ go build ./cmd/main.go
 
 This will create an executable named `main` (or `main.exe` on Windows) in the current directory.
 
+## Docker
+
+To build and run the bootstrap node using Docker, follow these steps:
+
+1.  **Build the Docker Image:**
+
+    ```bash
+    ./build-docker.sh
+    ```
+
+2.  **Run the Docker Container:**
+
+    ```bash
+    ./run-docker.sh
+    ```
+
+    You can specify a custom port (e.g., 4002):
+
+    ```bash
+    ./run-docker.sh 4002
+    ```
+
+    This script will also output the multiaddress of the running bootstrap node.
+
 ## Configuration
 
 To ensure a consistent Peer ID and multiaddress for your bootstrap node, you should configure it with a static private key. If no private key is provided, a new one will be generated on each startup, resulting in a different Peer ID and multiaddress.
