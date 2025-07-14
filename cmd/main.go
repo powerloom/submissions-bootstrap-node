@@ -68,10 +68,7 @@ func main() {
 	}
 
 	// Load config
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Warnf("Failed to load config: %v. A new private key will be generated.", err)
-	}
+	cfg := config.LoadConfig()
 
 	// Create a context that is canceled on a graceful shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())
