@@ -12,7 +12,7 @@ docker rm ${CONTAINER_NAME} > /dev/null 2>&1 || true
 
 echo "🚀 Running ${IMAGE_NAME} on port ${PORT}..."
 
-docker run -d -p ${PORT}:4001 --name ${CONTAINER_NAME} ${IMAGE_NAME} --port=4001
+docker run -d -p ${PORT}:4001 --name ${CONTAINER_NAME} --env-file ./.env ${IMAGE_NAME} --port=4001
 
 # Give the container a moment to start up
 sleep 3
