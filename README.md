@@ -60,7 +60,7 @@ To ensure a consistent Peer ID and multiaddress for your bootstrap node, you sho
     go run ./cmd/main.go --generate-key
     ```
 
-    This will output the generated private key (hex-encoded), the derived Peer ID, and a local placeholder multiaddress. Copy the `Generated Private Key (hex)` value.
+    This will output the generated private key (hex-encoded, 128 characters long), the derived Peer ID, and a local placeholder multiaddress. Copy the `Generated Private Key (hex)` value.
 
 2.  **Configure the `.env` file:**
 

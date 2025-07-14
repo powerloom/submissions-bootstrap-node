@@ -28,6 +28,7 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode private key: %w", err)
 		}
+		// Use crypto.UnmarshalEd25519PrivateKey for raw Ed25519 private keys
 		priv, err = crypto.UnmarshalEd25519PrivateKey(privBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
