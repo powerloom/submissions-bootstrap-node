@@ -20,29 +20,33 @@ go build ./cmd/main.go
 
 This will create an executable named `main` (or `main.exe` on Windows) in the current directory.
 
-## Docker
+## Docker with Docker Compose
 
-To build and run the bootstrap node using Docker, follow these steps:
+To build and run the bootstrap node using Docker Compose, follow these steps:
 
 1.  **Build the Docker Image:**
 
     ```bash
-    ./build-docker.sh
+    docker-compose build
     ```
 
-2.  **Run the Docker Container:**
+2.  **Start the Docker Container:**
 
     ```bash
-    ./run-docker.sh
+    ./start.sh
     ```
 
-    You can specify a custom port (e.g., 4002):
+3.  **Stop the Docker Container:**
 
     ```bash
-    ./run-docker.sh 4002
+    ./stop.sh
     ```
 
-    This script will also output the multiaddress of the running bootstrap node.
+    You can view the logs of the running service:
+
+    ```bash
+    docker-compose logs -f bootstrap-node
+    ```
 
 ## Configuration
 
@@ -60,7 +64,7 @@ To ensure a consistent Peer ID and multiaddress for your bootstrap node, you sho
 
 2.  **Configure the `.env` file:**
 
-    Copy `.env.example` to `.env`:
+    Create a `.env` file in the same directory as `docker-compose.yaml` (if it doesn't exist):
 
     ```bash
     cp .env.example .env
@@ -72,9 +76,9 @@ To ensure a consistent Peer ID and multiaddress for your bootstrap node, you sho
     PRIVATE_KEY=your_generated_private_key_here
     ```
 
-## Run
+## Run (Local Executable)
 
-You can run the bootstrap node on a default port or specify a custom one.
+You can run the bootstrap node locally (without Docker) on a default port or specify a custom one.
 
 ### Default Port (4001)
 

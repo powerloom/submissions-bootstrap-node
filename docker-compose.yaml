@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bootstrap-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    env_file:
+      - ./.env
+    command: ["./submissions-bootstrap-node", "--port=4001"]
+    restart: unless-stopped
