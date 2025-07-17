@@ -56,6 +56,7 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		libp2p.ConnectionManager(connMgr),
 		libp2p.ForceReachabilityPublic(), // Announce ourselves as publicly reachable
 		libp2p.NATPortMap(),              // Attempt to open ports via NAT
+		libp2p.EnableRelayService(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
