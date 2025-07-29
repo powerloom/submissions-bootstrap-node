@@ -15,7 +15,8 @@ WORKDIR /root/
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /submissions-bootstrap-node .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-EXPOSE 4001
 
-ENTRYPOINT ["./submissions-bootstrap-node"]
+ENTRYPOINT ["./entrypoint.sh"]

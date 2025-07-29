@@ -6,8 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "4001:4001"
+      - "${BOOTSTRAP_PORT:-4001}:${BOOTSTRAP_PORT:-4001}"
     env_file:
       - ./.env
-    command: ["./submissions-bootstrap-node", "--port=4001"]
     restart: unless-stopped
