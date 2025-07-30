@@ -5,18 +5,23 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	log "github.com/sirupsen/logrus"
 )
 
-// BootstrapNode struct holds the libp2p host
+// BootstrapNode struct holds the libp2p host and the DHT
 type BootstrapNode struct {
 	Host host.Host
+	DHT  *dht.IpfsDHT
 }
 
 // NewBootstrapNode creates and initializes a new libp2p host configured as a bootstrap node
@@ -29,7 +34,6 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode private key: %w", err)
 		}
-		// Use crypto.UnmarshalEd25519PrivateKey for raw Ed25519 private keys
 		priv, err = crypto.UnmarshalEd25519PrivateKey(privBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
@@ -41,23 +45,37 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		}
 	}
 
-	// Create a connection manager
+	// Create a new resource manager with scaled limits to avoid conflicts.
+	limiter := rcmgr.NewFixedLimiter(rcmgr.DefaultLimits.AutoScale())
+	rscMgr, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource manager: %w", err)
+	}
+
+	// Create a connection manager.
 	connMgr, err := connmgr.NewConnManager(
 		100, // Lowwater
 		400, // Highwater
+		connmgr.WithGracePeriod(time.Minute),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection manager: %w", err)
 	}
 
-	// Create the libp2p host
+	var kadDHT *dht.IpfsDHT
+	// Create the libp2p host with the DHT in server mode.
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
 		libp2p.Identity(priv),
 		libp2p.ConnectionManager(connMgr),
-		libp2p.ForceReachabilityPublic(), // Announce ourselves as publicly reachable
-		libp2p.NATPortMap(),              // Attempt to open ports via NAT
+		libp2p.ResourceManager(rscMgr),
+		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+			kadDHT, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
+			return kadDHT, err
+		}),
 		libp2p.EnableRelayService(),
+		libp2p.ForceReachabilityPublic(),
+		libp2p.NATPortMap(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
@@ -73,5 +91,6 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 
 	return &BootstrapNode{
 		Host: h,
+		DHT:  kadDHT,
 	}, nil
 }

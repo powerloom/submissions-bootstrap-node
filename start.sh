@@ -8,4 +8,4 @@ fi
 
 echo "Starting bootstrap node (port: ${BOOTSTRAP_PORT:-<from .env>})"
 
-docker-compose up -d
+docker-compose up
