@@ -1,8 +1,8 @@
 module submissions-bootstrap-node
 
-go 1.22.0
+go 1.23
 
-toolchain go1.23.1
+toolchain go1.24.5
 
 require (
 	github.com/libp2p/go-libp2p v0.39.1
@@ -30,6 +30,7 @@ require (
 	github.com/google/pprof v0.0.0-20250202011525-fc3143867406 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipfs/go-cid v0.5.0 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
@@ -41,6 +42,7 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
+	github.com/libp2p/go-libp2p-pubsub v0.14.2 // indirect
 	github.com/libp2p/go-msgio v0.3.0 // indirect
 	github.com/libp2p/go-nat v0.2.0 // indirect
 	github.com/libp2p/go-netroute v0.2.2 // indirect

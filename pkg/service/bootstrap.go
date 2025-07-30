@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -60,6 +61,12 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
+	}
+
+	// Create a new GossipSub instance
+	_, err = pubsub.NewGossipSub(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pubsub: %w", err)
 	}
 
 	log.Infof("Libp2p host created with ID: %s", h.ID().String())
