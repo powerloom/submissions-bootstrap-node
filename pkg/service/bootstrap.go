@@ -45,9 +45,25 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		}
 	}
 
-	// Create a new resource manager with scaled limits to avoid conflicts.
-	limiter := rcmgr.NewFixedLimiter(rcmgr.DefaultLimits.AutoScale())
-	rscMgr, err := rcmgr.NewResourceManager(limiter)
+	// 1. Create a new resource manager with scaled limits.
+	scalingLimits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&scalingLimits)
+	scaledDefaultLimits := scalingLimits.AutoScale()
+	cfg := rcmgr.PartialLimitConfig{
+		System: rcmgr.ResourceLimits{
+			StreamsOutbound: rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.Unlimited,
+			Streams:         rcmgr.Unlimited,
+			Conns:           rcmgr.Unlimited,
+			ConnsOutbound:   rcmgr.Unlimited,
+			ConnsInbound:    rcmgr.Unlimited,
+			FD:              rcmgr.Unlimited,
+			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
+		},
+	}
+	limits := cfg.Build(scaledDefaultLimits)
+	limiter := rcmgr.NewFixedLimiter(limits)
+	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource manager: %w", err)
 	}
@@ -67,8 +83,8 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
 		libp2p.Identity(priv),
-		libp2p.ConnectionManager(connMgr),
 		libp2p.ResourceManager(rscMgr),
+		libp2p.ConnectionManager(connMgr),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			kadDHT, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
 			return kadDHT, err
