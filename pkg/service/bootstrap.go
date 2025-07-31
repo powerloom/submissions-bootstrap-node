@@ -45,22 +45,32 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		}
 	}
 
-	// 1. Create a new resource manager with custom limits, bypassing AutoScale.
-	// Start with the default scaling limits, but build a concrete config from our partial overrides.
-	limitConfig := rcmgr.PartialLimitConfig{
-		System: rcmgr.ResourceLimits{
-			StreamsOutbound: rcmgr.Unlimited,
-			StreamsInbound:  rcmgr.Unlimited,
-			Streams:         rcmgr.Unlimited,
-			Conns:           rcmgr.Unlimited,
-			ConnsOutbound:   rcmgr.Unlimited,
-			ConnsInbound:    rcmgr.Unlimited,
-			FD:              rcmgr.Unlimited,
-			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
-		},
-	}.Build(rcmgr.DefaultLimits.AutoScale()) // We use AutoScale here just to get a valid ConcreteLimitConfig
+	// 1. Create a new resource manager with custom limits.
+	scalingLimits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&scalingLimits)
 
-	limiter := rcmgr.NewFixedLimiter(limitConfig)
+	cfg := rcmgr.PartialLimitConfig{
+		System: rcmgr.ResourceLimits{
+			Conns:         rcmgr.Unlimited,
+			ConnsInbound:  rcmgr.Unlimited,
+			ConnsOutbound: rcmgr.Unlimited,
+			Streams:       rcmgr.Unlimited,
+			StreamsInbound: rcmgr.Unlimited,
+			StreamsOutbound: rcmgr.Unlimited,
+			FD:            rcmgr.Unlimited,
+			Memory:        rcmgr.LimitVal64(rcmgr.Unlimited),
+		},
+		Transient: rcmgr.ResourceLimits{
+			Conns:         rcmgr.Unlimited,
+			ConnsInbound:  rcmgr.Unlimited,
+			ConnsOutbound: rcmgr.Unlimited,
+			Streams:       rcmgr.Unlimited,
+			StreamsInbound: rcmgr.Unlimited,
+			StreamsOutbound: rcmgr.Unlimited,
+		},
+	}
+
+	limiter := rcmgr.NewFixedLimiter(cfg.Build(scalingLimits.AutoScale()))
 	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource manager: %w", err)
