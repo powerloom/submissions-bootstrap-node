@@ -45,11 +45,9 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 		}
 	}
 
-	// 1. Create a new resource manager with scaled limits.
-	scalingLimits := rcmgr.DefaultLimits
-	libp2p.SetDefaultServiceLimits(&scalingLimits)
-	scaledDefaultLimits := scalingLimits.AutoScale()
-	cfg := rcmgr.PartialLimitConfig{
+	// 1. Create a new resource manager with custom limits, bypassing AutoScale.
+	// Start with the default scaling limits, but build a concrete config from our partial overrides.
+	limitConfig := rcmgr.PartialLimitConfig{
 		System: rcmgr.ResourceLimits{
 			StreamsOutbound: rcmgr.Unlimited,
 			StreamsInbound:  rcmgr.Unlimited,
@@ -60,9 +58,9 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 			FD:              rcmgr.Unlimited,
 			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
 		},
-	}
-	limits := cfg.Build(scaledDefaultLimits)
-	limiter := rcmgr.NewFixedLimiter(limits)
+	}.Build(rcmgr.DefaultLimits.AutoScale()) // We use AutoScale here just to get a valid ConcreteLimitConfig
+
+	limiter := rcmgr.NewFixedLimiter(limitConfig)
 	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource manager: %w", err)
