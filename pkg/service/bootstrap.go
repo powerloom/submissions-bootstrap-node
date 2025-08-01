@@ -47,24 +47,28 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 
 	// 1. Create a new resource manager with custom limits.
 	scalingLimits := rcmgr.DefaultLimits
-	libp2p.SetDefaultServiceLimits(&scalingLimits)
-
-	limits := rcmgr.ResourceLimits{
-		StreamsOutbound: rcmgr.Unlimited,
-		StreamsInbound:  rcmgr.Unlimited,
-		Streams:         rcmgr.Unlimited,
-		Conns:           rcmgr.Unlimited,
-		ConnsOutbound:   rcmgr.Unlimited,
-		ConnsInbound:    rcmgr.Unlimited,
-		FD:              rcmgr.Unlimited,
-		Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
-	}
-
 	cfg := rcmgr.PartialLimitConfig{
-		System:    limits,
-		Transient: limits,
+		System: rcmgr.ResourceLimits{
+			StreamsOutbound: rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.Unlimited,
+			Streams:         rcmgr.Unlimited,
+			Conns:           rcmgr.Unlimited,
+			ConnsOutbound:   rcmgr.Unlimited,
+			ConnsInbound:    rcmgr.Unlimited,
+			FD:              rcmgr.Unlimited,
+			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
+		},
+		Transient: rcmgr.ResourceLimits{
+			StreamsOutbound: rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.Unlimited,
+			Streams:         rcmgr.Unlimited,
+			Conns:           rcmgr.Unlimited,
+			ConnsOutbound:   rcmgr.Unlimited,
+			ConnsInbound:    rcmgr.Unlimited,
+			FD:              rcmgr.Unlimited,
+			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
+		},
 	}
-
 	limiter := rcmgr.NewFixedLimiter(cfg.Build(scalingLimits.AutoScale()))
 	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
