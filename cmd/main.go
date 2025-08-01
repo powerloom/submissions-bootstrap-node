@@ -33,9 +33,11 @@ func main() {
 		level = log.InfoLevel
 	}
 	log.SetLevel(level)
+	fmt.Printf("DEBUG: LOG_LEVEL from env: %s\n", os.Getenv("LOG_LEVEL"))
 
 	// Set libp2p logging level based on environment variable
 	libp2pLogLevel := os.Getenv("LIBP2P_LOGGING")
+	fmt.Printf("DEBUG: LIBP2P_LOGGING from env: %s\n", libp2pLogLevel)
 	if libp2pLogLevel != "" {
 		switch libp2pLogLevel {
 		case "debug":
