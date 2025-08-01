@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 func main() {
@@ -27,7 +28,34 @@ func main() {
 
 	// Initialize logger
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
-	log.SetLevel(log.InfoLevel)
+	level, err := log.ParseLevel(os.Getenv("LOG_LEVEL"))
+	if err != nil {
+		level = log.InfoLevel
+	}
+	log.SetLevel(level)
+
+	// Set libp2p logging level based on environment variable
+	libp2pLogLevel := os.Getenv("LIBP2P_LOGGING")
+	if libp2pLogLevel != "" {
+		switch libp2pLogLevel {
+		case "debug":
+			logging.SetAllLoggers(logging.LevelDebug)
+		case "info":
+			logging.SetAllLoggers(logging.LevelInfo)
+		case "warn":
+			logging.SetAllLoggers(logging.LevelWarn)
+		case "error":
+			logging.SetAllLoggers(logging.LevelError)
+		case "fatal":
+			logging.SetAllLoggers(logging.LevelFatal)
+		default:
+			log.Warnf("Unknown LIBP2P_LOGGING level: %s. Defaulting to info.", libp2pLogLevel)
+			logging.SetAllLoggers(logging.LevelInfo)
+		}
+	} else {
+		// Default libp2p logging to info if not specified
+		logging.SetAllLoggers(logging.LevelInfo)
+	}
 
 	if *generateKey {
 		// Generate a new Ed25519 private key
