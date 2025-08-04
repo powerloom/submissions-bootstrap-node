@@ -105,7 +105,7 @@ func main() {
 	defer cancel()
 
 	// Initialize and start the bootstrap node service
-	node, err := service.NewBootstrapNode(ctx, *port, cfg.PrivateKey)
+	node, err := service.NewBootstrapNode(ctx, *port, cfg)
 	if err != nil {
 		log.Fatalf("Failed to create bootstrap node: %v", err)
 	}

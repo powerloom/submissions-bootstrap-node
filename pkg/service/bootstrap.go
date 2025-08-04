@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"submissions-bootstrap-node/pkg/config"
+
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -19,6 +21,7 @@ import (
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	log "github.com/sirupsen/logrus"
+
 )
 
 // BootstrapNode struct holds the libp2p host and the DHT
@@ -28,12 +31,12 @@ type BootstrapNode struct {
 }
 
 // NewBootstrapNode creates and initializes a new libp2p host configured as a bootstrap node
-func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*BootstrapNode, error) {
+func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*BootstrapNode, error) {
 	var priv crypto.PrivKey
 	var err error
 
-	if privateKeyHex != "" {
-		privBytes, err := hex.DecodeString(privateKeyHex)
+	if cfg.PrivateKey != "" {
+		privBytes, err := hex.DecodeString(cfg.PrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode private key: %w", err)
 		}
@@ -50,7 +53,7 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 
 	// 1. Create a new resource manager with custom limits.
 	scalingLimits := rcmgr.DefaultLimits
-	cfg := rcmgr.PartialLimitConfig{
+	limitsCfg := rcmgr.PartialLimitConfig{
 		System: rcmgr.ResourceLimits{
 			StreamsOutbound: rcmgr.Unlimited,
 			StreamsInbound:  rcmgr.Unlimited,
@@ -72,7 +75,7 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
 		},
 	}
-	limiter := rcmgr.NewFixedLimiter(cfg.Build(scalingLimits.AutoScale()))
+	limiter := rcmgr.NewFixedLimiter(limitsCfg.Build(scalingLimits.AutoScale()))
 	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource manager: %w", err)
@@ -80,8 +83,8 @@ func NewBootstrapNode(ctx context.Context, port int, privateKeyHex string) (*Boo
 
 	// Create a connection manager.
 	connMgr, err := connmgr.NewConnManager(
-		100, // Lowwater
-		400, // Highwater
+		cfg.ConnManagerLowWater,  // Lowwater
+		cfg.ConnManagerHighWater, // Highwater
 		connmgr.WithGracePeriod(time.Minute),
 	)
 	if err != nil {
