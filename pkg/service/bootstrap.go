@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -92,8 +93,8 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	}
 
 	var kadDHT *dht.IpfsDHT
-	// Create the libp2p host with the DHT in server mode.
-	h, err := libp2p.New(
+	// Create the libp2p host options
+	opts := []libp2p.Option{
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
 		libp2p.Identity(priv),
 		libp2p.ResourceManager(rscMgr),
@@ -107,7 +108,22 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
 		libp2p.Transport(tcp.NewTCPTransport),
-	)
+	}
+
+	// Add public IP address if configured
+	if cfg.PublicIP != "" {
+		publicAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", cfg.PublicIP, port))
+		if err != nil {
+			log.Errorf("Failed to create public multiaddr: %v", err)
+		} else {
+			opts = append(opts, libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+				return append(addrs, publicAddr)
+			}))
+		}
+	}
+
+	// Create the libp2p host with the DHT in server mode.
+	h, err := libp2p.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}

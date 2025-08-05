@@ -11,6 +11,7 @@ type Config struct {
 	PrivateKey           string
 	ConnManagerLowWater  int
 	ConnManagerHighWater int
+	PublicIP             string
 }
 
 func LoadConfig() Config {
@@ -18,6 +19,7 @@ func LoadConfig() Config {
 		PrivateKey:           os.Getenv("PRIVATE_KEY"),
 		ConnManagerLowWater:  getEnvAsInt("CONN_MANAGER_LOW_WATER", 20000),
 		ConnManagerHighWater: getEnvAsInt("CONN_MANAGER_HIGH_WATER", 50000),
+		PublicIP:             os.Getenv("PUBLIC_IP"),
 	}
 }
 
