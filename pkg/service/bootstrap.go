@@ -11,17 +11,17 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	log "github.com/sirupsen/logrus"
-
 )
 
 // BootstrapNode struct holds the libp2p host and the DHT
@@ -118,7 +118,18 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 		return nil, fmt.Errorf("failed to create pubsub: %w", err)
 	}
 
-	log.Infof("Libp2p host created with ID: %s", h.ID().String())
+	log.Infof("Libp2p host created with ID: %s, listening on: %v", h.ID(), h.Addrs())
+	log.Infof("Bootstrap node DHT routing table size: %d", kadDHT.RoutingTable().Size())
+	log.Infof("Bootstrap node created with ID: %s, listening on: %v", h.ID(), h.Addrs())
+
+	h.Network().Notify(&network.NotifyBundle{
+		ConnectedF: func(_ network.Network, conn network.Conn) {
+			log.Infof("Bootstrap Peer connected: %s, Addr: %s", conn.RemotePeer(), conn.RemoteMultiaddr())
+		},
+		DisconnectedF: func(_ network.Network, conn network.Conn) {
+			log.Infof("Bootstrap Peer disconnected: %s, Addr: %s", conn.RemotePeer(), conn.RemoteMultiaddr())
+		},
+	})
 
 	return &BootstrapNode{
 		Host: h,
