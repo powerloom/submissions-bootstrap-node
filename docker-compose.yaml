@@ -10,3 +10,10 @@ services:
     env_file:
       - ./.env
     restart: unless-stopped
+    volumes:
+      # Persist logs on the host VPS
+      - ./logs:/app/logs
+      - ./logs/archive:/app/logs/archive
+    environment:
+      - LOG_FILE=/app/logs/bootstrap-node.log
+      - LOG_LEVEL=${LOG_LEVEL:-info}

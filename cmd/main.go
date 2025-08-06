@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"submissions-bootstrap-node/pkg/config"
 	"submissions-bootstrap-node/pkg/service"
+	"submissions-bootstrap-node/pkg/utils"
 	"syscall"
 	"time"
 
@@ -34,12 +35,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize logger
-	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
-	level, err := log.ParseLevel(os.Getenv("LOG_LEVEL"))
-	if err != nil {
-		level = log.InfoLevel
-	}
-	log.SetLevel(level)
+	utils.InitLogger()
 	fmt.Printf("DEBUG: LOG_LEVEL from env: %s\n", os.Getenv("LOG_LEVEL"))
 
 	// Set libp2p logging level based on environment variable
