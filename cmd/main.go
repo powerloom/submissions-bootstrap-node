@@ -8,21 +8,28 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"submissions-bootstrap-node/pkg/config"
 	"submissions-bootstrap-node/pkg/service"
 	"syscall"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
-	logging "github.com/ipfs/go-log/v2"
 )
 
 func main() {
 	// Command-line flags
-	port := flag.Int("port", 4001, "Port to listen on")
+	defaultPort := 4001
+	if portStr := os.Getenv("BOOTSTRAP_PORT"); portStr != "" {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			defaultPort = p
+		}
+	}
+	port := flag.Int("port", defaultPort, "Port to listen on")
 	generateKey := flag.Bool("generate-key", false, "Generate a new private key and exit")
 	flag.Parse()
 
