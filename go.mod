@@ -1,8 +1,6 @@
 module submissions-bootstrap-node
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.24.5
 
 require (
 	github.com/ipfs/go-log/v2 v2.8.1
