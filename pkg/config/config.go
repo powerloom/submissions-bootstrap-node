@@ -17,8 +17,9 @@ type Config struct {
 func LoadConfig() Config {
 	return Config{
 		PrivateKey:           os.Getenv("PRIVATE_KEY"),
-		ConnManagerLowWater:  getEnvAsInt("CONN_MANAGER_LOW_WATER", 20000),
-		ConnManagerHighWater: getEnvAsInt("CONN_MANAGER_HIGH_WATER", 50000),
+		// Bootstrap nodes need more connections than regular nodes for discovery
+		ConnManagerLowWater:  getEnvAsInt("CONN_MANAGER_LOW_WATER", 500),
+		ConnManagerHighWater: getEnvAsInt("CONN_MANAGER_HIGH_WATER", 2000),
 		PublicIP:             os.Getenv("PUBLIC_IP"),
 	}
 }
