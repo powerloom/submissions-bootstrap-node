@@ -1,1 +1,21 @@
+# Binary files (never commit)
 main
+bootstrap-node
+submissions-bootstrap-node
+
+# Build artifacts
+*.test
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Binary output directory if using one
+bin/
+
+# Environment files
+.env
+.env.*
+
+# XML files (repomix output)
+*.xml

@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/powerloom/snapshot-sequencer-validator/pkgs/gossipconfig"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -128,11 +129,21 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}
 
-	// Create a new GossipSub instance
-	_, err = pubsub.NewGossipSub(ctx, h)
+	// Get standardized gossipsub parameters for consistency across network
+	gossipParams, peerScoreParams, peerScoreThresholds, paramHash := gossipconfig.ConfigureSnapshotSubmissionsMesh(h.ID())
+	
+	// Create a new GossipSub instance with standardized parameters
+	_, err = pubsub.NewGossipSub(ctx, h,
+		pubsub.WithGossipSubParams(*gossipParams),
+		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
+		pubsub.WithFloodPublish(true),
+		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pubsub: %w", err)
 	}
+	
+	log.Infof("🔑 Gossipsub parameter hash: %s (bootstrap node)", paramHash)
 
 	log.Infof("Libp2p host created with ID: %s, listening on: %v", h.ID(), h.Addrs())
 	log.Infof("Bootstrap node DHT routing table size: %d", kadDHT.RoutingTable().Size())

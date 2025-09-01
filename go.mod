@@ -8,6 +8,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.34.0
 	github.com/libp2p/go-libp2p-pubsub v0.14.2
 	github.com/multiformats/go-multiaddr v0.16.1
+	github.com/powerloom/snapshot-sequencer-validator v0.0.0-20250901113836-e70d23e8c3cd
 	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
