@@ -28,27 +28,35 @@ import (
 
 // BootstrapNode struct holds the libp2p host and the DHT
 type BootstrapNode struct {
-	Host host.Host
-	DHT  *dht.IpfsDHT
+	Host   host.Host
+	Pubsub *pubsub.PubSub
+	DHT    *dht.IpfsDHT
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewBootstrapNode creates and initializes a new libp2p host configured as a bootstrap node
 func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*BootstrapNode, error) {
+	// Create cancelable context for this bootstrap node
+	hostCtx, cancel := context.WithCancel(ctx)
 	var priv crypto.PrivKey
 	var err error
 
 	if cfg.PrivateKey != "" {
 		privBytes, err := hex.DecodeString(cfg.PrivateKey)
 		if err != nil {
+			cancel()
 			return nil, fmt.Errorf("failed to decode private key: %w", err)
 		}
 		priv, err = crypto.UnmarshalEd25519PrivateKey(privBytes)
 		if err != nil {
+			cancel()
 			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
 		}
 	} else {
 		priv, _, err = crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
+			cancel()
 			return nil, fmt.Errorf("failed to generate private key: %w", err)
 		}
 	}
@@ -80,6 +88,7 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	limiter := rcmgr.NewFixedLimiter(limitsCfg.Build(scalingLimits.AutoScale()))
 	rscMgr, err := rcmgr.NewResourceManager(limiter, rcmgr.WithMetricsDisabled())
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create resource manager: %w", err)
 	}
 
@@ -90,10 +99,12 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 		connmgr.WithGracePeriod(time.Minute),
 	)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create connection manager: %w", err)
 	}
 
 	var kadDHT *dht.IpfsDHT
+	var notificationBundle *network.NotifyBundle
 	// Create the libp2p host options
 	opts := []libp2p.Option{
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
@@ -101,7 +112,7 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 		libp2p.ResourceManager(rscMgr),
 		libp2p.ConnectionManager(connMgr),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			kadDHT, err = dht.New(ctx, h, dht.Mode(dht.ModeServer))
+			kadDHT, err = dht.New(hostCtx, h, dht.Mode(dht.ModeServer))
 			return kadDHT, err
 		}),
 		libp2p.EnableRelayService(),
@@ -126,20 +137,22 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	// Create the libp2p host with the DHT in server mode.
 	h, err := libp2p.New(opts...)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}
 
 	// Get standardized gossipsub parameters for consistency across network
 	gossipParams, peerScoreParams, peerScoreThresholds, paramHash := gossipconfig.ConfigureSnapshotSubmissionsMesh(h.ID())
-	
+
 	// Create a new GossipSub instance with standardized parameters
-	_, err = pubsub.NewGossipSub(ctx, h,
+	gs, err := pubsub.NewGossipSub(hostCtx, h,
 		pubsub.WithGossipSubParams(*gossipParams),
 		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
 		pubsub.WithFloodPublish(true),
 		pubsub.WithMessageSignaturePolicy(pubsub.StrictSign),
 	)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("failed to create pubsub: %w", err)
 	}
 	
@@ -149,17 +162,30 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	log.Infof("Bootstrap node DHT routing table size: %d", kadDHT.RoutingTable().Size())
 	log.Infof("Bootstrap node created with ID: %s, listening on: %v", h.ID(), h.Addrs())
 
-	h.Network().Notify(&network.NotifyBundle{
+	// Store notification bundle for cleanup
+	notificationBundle = &network.NotifyBundle{
 		ConnectedF: func(_ network.Network, conn network.Conn) {
 			log.Infof("Bootstrap Peer connected: %s, Addr: %s", conn.RemotePeer(), conn.RemoteMultiaddr())
 		},
 		DisconnectedF: func(_ network.Network, conn network.Conn) {
 			log.Infof("Bootstrap Peer disconnected: %s, Addr: %s", conn.RemotePeer(), conn.RemoteMultiaddr())
 		},
-	})
+	}
+	h.Network().Notify(notificationBundle)
 
 	return &BootstrapNode{
-		Host: h,
-		DHT:  kadDHT,
+		Host:   h,
+		Pubsub: gs,
+		DHT:    kadDHT,
+		ctx:    hostCtx,
+		cancel: cancel,
 	}, nil
+}
+
+// Close closes the bootstrap node and releases all resources
+func (n *BootstrapNode) Close() error {
+	if n.cancel != nil {
+		n.cancel()
+	}
+	return n.Host.Close()
 }

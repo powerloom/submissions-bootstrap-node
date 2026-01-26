@@ -16,6 +16,6 @@ bin/
 # Environment files
 .env
 .env.*
-
+.DS_Store
 # XML files (repomix output)
 *.xml

@@ -142,5 +142,5 @@ func main() {
 
 	fmt.Println()
 	log.Info("Shutting down bootstrap node...")
-	node.Host.Close()
+	node.Close()
 }
