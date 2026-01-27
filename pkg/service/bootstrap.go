@@ -28,11 +28,12 @@ import (
 
 // BootstrapNode struct holds the libp2p host and the DHT
 type BootstrapNode struct {
-	Host   host.Host
-	Pubsub *pubsub.PubSub
-	DHT    *dht.IpfsDHT
-	ctx    context.Context
-	cancel context.CancelFunc
+	Host              host.Host
+	Pubsub            *pubsub.PubSub
+	DHT               *dht.IpfsDHT
+	notificationBundle *network.NotifyBundle
+	ctx               context.Context
+	cancel            context.CancelFunc
 }
 
 // NewBootstrapNode creates and initializes a new libp2p host configured as a bootstrap node
@@ -62,25 +63,29 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	}
 
 	// 1. Create a new resource manager with custom limits.
+	// BOUND connections to match connection manager limits to prevent unbounded peer scoring
+	// Peer scoring tracks state per connection, so bounding connections bounds peer score memory
 	scalingLimits := rcmgr.DefaultLimits
 	limitsCfg := rcmgr.PartialLimitConfig{
 		System: rcmgr.ResourceLimits{
 			StreamsOutbound: rcmgr.Unlimited,
 			StreamsInbound:  rcmgr.Unlimited,
 			Streams:         rcmgr.Unlimited,
-			Conns:           rcmgr.Unlimited,
-			ConnsOutbound:   rcmgr.Unlimited,
-			ConnsInbound:    rcmgr.Unlimited,
-			FD:              rcmgr.Unlimited,
-			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
+			// Bound connections to connection manager high water mark + buffer
+			// This ensures peer scoring state is bounded
+			Conns:         rcmgr.LimitVal(cfg.ConnManagerHighWater + 100), // Small buffer for transient connections
+			ConnsOutbound: rcmgr.LimitVal(cfg.ConnManagerHighWater + 100),
+			ConnsInbound:  rcmgr.LimitVal(cfg.ConnManagerHighWater + 100),
+			FD:            rcmgr.Unlimited,
+			Memory:       rcmgr.LimitVal64(rcmgr.Unlimited),
 		},
 		Transient: rcmgr.ResourceLimits{
 			StreamsOutbound: rcmgr.Unlimited,
 			StreamsInbound:  rcmgr.Unlimited,
 			Streams:         rcmgr.Unlimited,
-			Conns:           rcmgr.Unlimited,
-			ConnsOutbound:   rcmgr.Unlimited,
-			ConnsInbound:    rcmgr.Unlimited,
+			Conns:           rcmgr.LimitVal(cfg.ConnManagerHighWater + 100),
+			ConnsOutbound:   rcmgr.LimitVal(cfg.ConnManagerHighWater + 100),
+			ConnsInbound:    rcmgr.LimitVal(cfg.ConnManagerHighWater + 100),
 			FD:              rcmgr.Unlimited,
 			Memory:          rcmgr.LimitVal64(rcmgr.Unlimited),
 		},
@@ -144,7 +149,9 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	// Get standardized gossipsub parameters for consistency across network
 	gossipParams, peerScoreParams, peerScoreThresholds, paramHash := gossipconfig.ConfigureSnapshotSubmissionsMesh(h.ID())
 
-	// Create a new GossipSub instance with standardized parameters
+	// Create GossipSub with peer scoring for DDoS protection
+	// Peer scoring is bounded by resource manager connection limits (matching connection manager)
+	// Connection limits ensure peer score state cannot grow unbounded
 	gs, err := pubsub.NewGossipSub(hostCtx, h,
 		pubsub.WithGossipSubParams(*gossipParams),
 		pubsub.WithPeerScore(peerScoreParams, peerScoreThresholds),
@@ -157,7 +164,6 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	}
 	
 	log.Infof("🔑 Gossipsub parameter hash: %s (bootstrap node)", paramHash)
-
 	log.Infof("Libp2p host created with ID: %s, listening on: %v", h.ID(), h.Addrs())
 	log.Infof("Bootstrap node DHT routing table size: %d", kadDHT.RoutingTable().Size())
 	log.Infof("Bootstrap node created with ID: %s, listening on: %v", h.ID(), h.Addrs())
@@ -174,18 +180,46 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	h.Network().Notify(notificationBundle)
 
 	return &BootstrapNode{
-		Host:   h,
-		Pubsub: gs,
-		DHT:    kadDHT,
-		ctx:    hostCtx,
-		cancel: cancel,
+		Host:              h,
+		Pubsub:            gs,
+		DHT:               kadDHT,
+		notificationBundle: notificationBundle,
+		ctx:               hostCtx,
+		cancel:            cancel,
 	}, nil
 }
 
 // Close closes the bootstrap node and releases all resources
 func (n *BootstrapNode) Close() error {
+	var errs []error
+	
+	// Cancel context first to stop all background operations
 	if n.cancel != nil {
 		n.cancel()
 	}
-	return n.Host.Close()
+	
+	// Unregister notification bundle to prevent memory leaks
+	if n.notificationBundle != nil && n.Host != nil {
+		// Note: libp2p doesn't provide an Unregister method, but closing the host
+		// will clean up all network notifications and GossipSub resources
+	}
+	
+	// Close DHT to release routing table and provider storage
+	if n.DHT != nil {
+		if err := n.DHT.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close DHT: %w", err))
+		}
+	}
+	
+	// Close the host (this will close all connections and clean up resources)
+	if n.Host != nil {
+		if err := n.Host.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close host: %w", err))
+		}
+	}
+	
+	if len(errs) > 0 {
+		return fmt.Errorf("errors during shutdown: %v", errs)
+	}
+	return nil
 }
