@@ -139,8 +139,11 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
+	signal.Stop(sigs)
 
 	fmt.Println()
 	log.Info("Shutting down bootstrap node...")
-	node.Close()
+	if err := node.Close(); err != nil {
+		log.Errorf("Error during shutdown: %v", err)
+	}
 }

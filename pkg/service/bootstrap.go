@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
@@ -179,14 +180,18 @@ func NewBootstrapNode(ctx context.Context, port int, cfg config.Config) (*Bootst
 	}
 	h.Network().Notify(notificationBundle)
 
-	return &BootstrapNode{
+	node := &BootstrapNode{
 		Host:              h,
 		Pubsub:            gs,
 		DHT:               kadDHT,
 		notificationBundle: notificationBundle,
 		ctx:               hostCtx,
 		cancel:            cancel,
-	}, nil
+	}
+
+	go node.startPeerstoreGC()
+
+	return node, nil
 }
 
 // Close closes the bootstrap node and releases all resources
@@ -200,8 +205,7 @@ func (n *BootstrapNode) Close() error {
 	
 	// Unregister notification bundle to prevent memory leaks
 	if n.notificationBundle != nil && n.Host != nil {
-		// Note: libp2p doesn't provide an Unregister method, but closing the host
-		// will clean up all network notifications and GossipSub resources
+		n.Host.Network().StopNotify(n.notificationBundle)
 	}
 	
 	// Close DHT to release routing table and provider storage
@@ -222,4 +226,41 @@ func (n *BootstrapNode) Close() error {
 		return fmt.Errorf("errors during shutdown: %v", errs)
 	}
 	return nil
+}
+
+// startPeerstoreGC periodically removes stale peers from the peerstore.
+// The addr book GCs expired addresses, but keybook/protobook/metadata stores
+// grow unboundedly without explicit RemovePeer calls.
+func (n *BootstrapNode) startPeerstoreGC() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-n.ctx.Done():
+			return
+		case <-ticker.C:
+			peers := n.Host.Peerstore().Peers()
+			connectedPeers := n.Host.Network().Peers()
+			connectedSet := make(map[peer.ID]struct{}, len(connectedPeers))
+			for _, p := range connectedPeers {
+				connectedSet[p] = struct{}{}
+			}
+			removed := 0
+			for _, p := range peers {
+				if p == n.Host.ID() {
+					continue
+				}
+				if _, connected := connectedSet[p]; connected {
+					continue
+				}
+				if addrs := n.Host.Peerstore().Addrs(p); len(addrs) == 0 {
+					n.Host.Peerstore().RemovePeer(p)
+					removed++
+				}
+			}
+			if removed > 0 {
+				log.Infof("Peerstore GC: removed %d stale peers, %d remaining", removed, len(n.Host.Peerstore().Peers()))
+			}
+		}
+	}
 }
