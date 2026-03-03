@@ -229,10 +229,11 @@ func (n *BootstrapNode) Close() error {
 }
 
 // startPeerstoreGC periodically removes stale peers from the peerstore.
-// The addr book GCs expired addresses, but keybook/protobook/metadata stores
-// grow unboundedly without explicit RemovePeer calls.
+// Disconnected peers are cleaned immediately: ClearAddrs is called first
+// (RemovePeer does not clear addresses per the libp2p interface contract),
+// then RemovePeer removes keybook/protobook/metadata entries.
 func (n *BootstrapNode) startPeerstoreGC() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
@@ -253,13 +254,15 @@ func (n *BootstrapNode) startPeerstoreGC() {
 				if _, connected := connectedSet[p]; connected {
 					continue
 				}
-				if addrs := n.Host.Peerstore().Addrs(p); len(addrs) == 0 {
-					n.Host.Peerstore().RemovePeer(p)
-					removed++
-				}
+				n.Host.Peerstore().ClearAddrs(p)
+				n.Host.Peerstore().RemovePeer(p)
+				removed++
 			}
+			remaining := len(n.Host.Peerstore().Peers())
 			if removed > 0 {
-				log.Infof("Peerstore GC: removed %d stale peers, %d remaining", removed, len(n.Host.Peerstore().Peers()))
+				log.Infof("Peerstore GC: removed %d stale peers, %d remaining (connected: %d)", removed, remaining, len(connectedPeers))
+			} else {
+				log.Debugf("Peerstore GC: no stale peers removed, %d in store (connected: %d)", remaining, len(connectedPeers))
 			}
 		}
 	}
