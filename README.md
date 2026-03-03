@@ -107,6 +107,46 @@ INFO[2025-07-10T17:16:04+05:30] Listening on addresses: [/ip4/127.0.0.1/tcp/4001
 From the example above, a full multiaddress to use for other nodes would be:
 `/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWCNsSau1o9MeMVpHudvHaZRLESRcaGVK9FPKhdLU36BtF`
 
+## Debugging Memory / Performance
+
+### Periodic Status Logs
+
+Every 60 seconds the node logs a status line with key metrics:
+
+```
+Status: connected=150 peerstore=152 dht_rt=20 goroutines=45 heap_alloc=28MB heap_inuse=32MB sys=55MB
+```
+
+| Metric | What to watch for |
+|---|---|
+| `peerstore` growing >> `connected` | Peerstore GC not cleaning fast enough |
+| `dht_rt` growing unbounded | DHT routing table accumulating entries |
+| `goroutines` growing | Goroutine leak |
+| `heap_alloc` growing while others stable | Leak in libp2p internals (gossipsub, relay, etc.) |
+
+### pprof Endpoint
+
+Set `PPROF_PORT=6060` in your `.env` file to enable the Go pprof debug server. The port is already wired in `docker-compose.yaml`.
+
+```bash
+# Heap profile — what's using memory right now
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# Allocations — what's been allocating the most over time
+go tool pprof -alloc_space http://localhost:6060/debug/pprof/heap
+
+# Compare two snapshots to find what grew (most useful)
+curl -o heap1.pb.gz http://localhost:6060/debug/pprof/heap
+# ... wait 30 min ...
+curl -o heap2.pb.gz http://localhost:6060/debug/pprof/heap
+go tool pprof -base heap1.pb.gz heap2.pb.gz
+
+# Goroutine dump
+curl http://localhost:6060/debug/pprof/goroutine?debug=2
+```
+
+The pprof diff (`-base`) is the most powerful — it shows exactly which allocations grew in the window, narrowing down whether the source is peerstore, DHT, gossipsub, relay, or something else.
+
 ## Usage with Other Nodes
 
 To configure other libp2p nodes (like the `snapshotter-lite-local-collector` or `submission-topic-watcher`) to use this bootstrap node, you typically pass its full multiaddress via a command-line flag or environment variable (e.g., `--bootstrap` flag for the watcher, or `BOOTSTRAP_NODE_ADDR` environment variable for the collector).

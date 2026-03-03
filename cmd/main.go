@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"submissions-bootstrap-node/pkg/config"
 	"submissions-bootstrap-node/pkg/service"
@@ -117,9 +120,20 @@ func main() {
 	log.Infof("🚀 Bootstrap node started. ID: %s", node.Host.ID().String())
 	log.Infof("🌍 Listening on addresses: %s", node.Host.Addrs())
 
-	// Start periodic peer logging
+	// Start pprof debug server if PPROF_PORT is set
+	if pprofPort := os.Getenv("PPROF_PORT"); pprofPort != "" {
+		go func() {
+			addr := ":" + pprofPort
+			log.Infof("Starting pprof server on %s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				log.Errorf("pprof server failed: %v", err)
+			}
+		}()
+	}
+
+	// Start periodic peer and memory logging
 	go func() {
-		ticker := time.NewTicker(60 * time.Second) // Log every 10 seconds
+		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -127,7 +141,15 @@ func main() {
 				return
 			case <-ticker.C:
 				peers := node.Host.Network().Peers()
-				log.Infof("Connected peers: %d", len(peers))
+				peerstoreSize := len(node.Host.Peerstore().Peers())
+				dhtSize := node.DHT.RoutingTable().Size()
+
+				var m runtime.MemStats
+				runtime.ReadMemStats(&m)
+
+				log.Infof("Status: connected=%d peerstore=%d dht_rt=%d goroutines=%d heap_alloc=%dMB heap_inuse=%dMB sys=%dMB",
+					len(peers), peerstoreSize, dhtSize, runtime.NumGoroutine(),
+					m.HeapAlloc/1024/1024, m.HeapInuse/1024/1024, m.Sys/1024/1024)
 				for _, p := range peers {
 					log.Debugf("  - %s", p.String())
 				}
