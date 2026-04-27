@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bootstrap-node:
     build:
@@ -19,3 +17,9 @@ services:
       - LOG_FILE=/app/logs/bootstrap-node.log
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - PPROF_PORT=${PPROF_PORT:-6060}
+    logs:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
