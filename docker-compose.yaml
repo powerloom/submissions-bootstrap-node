@@ -17,7 +17,7 @@ services:
       - LOG_FILE=/app/logs/bootstrap-node.log
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - PPROF_PORT=${PPROF_PORT:-6060}
-    logs:
+    logging:
       driver: "json-file"
       options:
         max-size: "10m"
