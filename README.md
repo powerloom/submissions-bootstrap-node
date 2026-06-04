@@ -2,13 +2,27 @@
 
 This service acts as a dedicated bootstrap node for the PowerLoom decentralized sequencer network. Its primary purpose is to provide a stable, well-known entry point for other libp2p nodes (like snapshotters and validators) to discover and connect to the network.
 
-By connecting to this bootstrap node, new peers can quickly find other participants in the network, facilitating efficient peer discovery and message propagation for Gossipsub topics.
+By connecting to this bootstrap node, new peers obtain a stable dial target and DHT routing assistance to find other participants; gossipsub mesh formation happens directly between snapshotters and validators.
 
 ## Features
 
 -   **Stable Entry Point:** Provides a consistent multiaddress for new nodes to join the network.
 -   **Peer Discovery:** Helps other nodes discover more peers in the network via libp2p's DHT.
--   **Lightweight:** Designed to be a simple, robust, and long-running service with minimal overhead.
+-   **Discovery-only:** Does **not** run gossipsub. Snapshotters and validators carry mesh traffic; the bootstrap node only accepts dial-ins and serves DHT routing.
+-   **Lightweight defaults:** Tight connection limits, bounded libp2p memory, no per-connection info logs unless opted in.
+
+## Resource model (why older builds used 2+ GiB / 300% CPU)
+
+A bootstrap node only needs TCP listen + Kademlia DHT. Prior versions also started **full gossipsub** (700ms heartbeats, peer scoring, flood publish) on every inbound peer, enabled **circuit relay** by default, allowed **500–2000** connections, and logged **every** connect/disconnect at info. That behaves like a mesh participant, not a rendezvous point — the `fix/memory-leak` peerstore GC did not change that.
+
+| Setting | Default (new) | Typical old prod `.env` |
+|---|---|---|
+| `CONN_MANAGER_HIGH_WATER` | `128` | `800` |
+| Gossipsub | off | on (unused, no topic join) |
+| `ENABLE_RELAY_SERVICE` | `true` (capped) | relay on, unbounded |
+| `RELAY_MAX_RESERVATIONS` | `256` | — |
+| `LOG_PEER_CONNECTIONS` | `false` | info log per peer |
+| `RCMGR_MEMORY_LIMIT_MB` | `512` | unlimited |
 
 ## Build
 
@@ -74,6 +88,15 @@ To ensure a consistent Peer ID and multiaddress for your bootstrap node, you sho
 
     ```dotenv
     PRIVATE_KEY=your_generated_private_key_here
+    PUBLIC_IP=your.vps.public.ip
+    # NAT snapshotters without PUBLIC_IP use bootstrap as AutoRelay static relay (default on)
+    # ENABLE_RELAY_SERVICE=true
+    # RELAY_MAX_RESERVATIONS=256
+    # RELAY_MAX_RESERVATIONS_PER_IP=32
+    # CONN_MANAGER_HIGH_WATER=256
+    # RCMGR_MEMORY_LIMIT_MB=512
+    # LOG_PEER_CONNECTIONS=false
+    # LIBP2P_LOGGING=warn
     ```
 
 ## Run (Local Executable)

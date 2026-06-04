@@ -103,8 +103,10 @@ func main() {
 		return
 	}
 
-	// Load config
 	cfg := config.LoadConfig()
+	log.Infof("Bootstrap config: conn_water=%d/%d relay=%t relay_slots=%d rcmgr_mem_mb=%d log_peer_conns=%t",
+		cfg.ConnManagerLowWater, cfg.ConnManagerHighWater,
+		cfg.EnableRelayService, cfg.RelayMaxReservations, cfg.RcmgrMemoryLimitMB, cfg.LogPeerConnections)
 
 	// Create a context that is canceled on a graceful shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())
