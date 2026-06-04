@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bootstrap-node:
     build:
@@ -7,6 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${BOOTSTRAP_PORT:-4001}:${BOOTSTRAP_PORT:-4001}"
+      - "${PPROF_PORT:-6060}:${PPROF_PORT:-6060}"
     env_file:
       - ./.env
     restart: unless-stopped
@@ -17,3 +16,10 @@ services:
     environment:
       - LOG_FILE=/app/logs/bootstrap-node.log
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PPROF_PORT=${PPROF_PORT:-6060}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"

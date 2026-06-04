@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"submissions-bootstrap-node/pkg/config"
 	"submissions-bootstrap-node/pkg/service"
@@ -100,8 +103,10 @@ func main() {
 		return
 	}
 
-	// Load config
 	cfg := config.LoadConfig()
+	log.Infof("Bootstrap config: conn_water=%d/%d relay=%t relay_slots=%d rcmgr_mem_mb=%d log_peer_conns=%t",
+		cfg.ConnManagerLowWater, cfg.ConnManagerHighWater,
+		cfg.EnableRelayService, cfg.RelayMaxReservations, cfg.RcmgrMemoryLimitMB, cfg.LogPeerConnections)
 
 	// Create a context that is canceled on a graceful shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())
@@ -117,9 +122,20 @@ func main() {
 	log.Infof("🚀 Bootstrap node started. ID: %s", node.Host.ID().String())
 	log.Infof("🌍 Listening on addresses: %s", node.Host.Addrs())
 
-	// Start periodic peer logging
+	// Start pprof debug server if PPROF_PORT is set
+	if pprofPort := os.Getenv("PPROF_PORT"); pprofPort != "" {
+		go func() {
+			addr := ":" + pprofPort
+			log.Infof("Starting pprof server on %s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				log.Errorf("pprof server failed: %v", err)
+			}
+		}()
+	}
+
+	// Start periodic peer and memory logging
 	go func() {
-		ticker := time.NewTicker(60 * time.Second) // Log every 10 seconds
+		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -127,7 +143,15 @@ func main() {
 				return
 			case <-ticker.C:
 				peers := node.Host.Network().Peers()
-				log.Infof("Connected peers: %d", len(peers))
+				peerstoreSize := len(node.Host.Peerstore().Peers())
+				dhtSize := node.DHT.RoutingTable().Size()
+
+				var m runtime.MemStats
+				runtime.ReadMemStats(&m)
+
+				log.Infof("Status: connected=%d peerstore=%d dht_rt=%d goroutines=%d heap_alloc=%dMB heap_inuse=%dMB sys=%dMB",
+					len(peers), peerstoreSize, dhtSize, runtime.NumGoroutine(),
+					m.HeapAlloc/1024/1024, m.HeapInuse/1024/1024, m.Sys/1024/1024)
 				for _, p := range peers {
 					log.Debugf("  - %s", p.String())
 				}
@@ -139,8 +163,11 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
+	signal.Stop(sigs)
 
 	fmt.Println()
 	log.Info("Shutting down bootstrap node...")
-	node.Host.Close()
+	if err := node.Close(); err != nil {
+		log.Errorf("Error during shutdown: %v", err)
+	}
 }
